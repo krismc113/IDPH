@@ -1,0 +1,44 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Illinois County Public Health Analysis",
+    "section": "",
+    "text": "This project examines county-level public health needs and healthcare resources across Illinois. By bringing together hospital Community Health Needs Assessments (CHNAs), local health department priorities, population characteristics, and geographic data, the analysis explores how community health needs vary across the state.\nThe project focuses on understanding patterns in healthcare access, community health priorities, rurality, and socioeconomic conditions. Geographic visualization helps identify differences between counties and highlights areas where additional resources, services, or public health interventions may be needed."
+  },
+  {
+    "objectID": "index.html#about-the-project",
+    "href": "index.html#about-the-project",
+    "title": "Illinois County Public Health Analysis",
+    "section": "",
+    "text": "This project examines county-level public health needs and healthcare resources across Illinois. By bringing together hospital Community Health Needs Assessments (CHNAs), local health department priorities, population characteristics, and geographic data, the analysis explores how community health needs vary across the state.\nThe project focuses on understanding patterns in healthcare access, community health priorities, rurality, and socioeconomic conditions. Geographic visualization helps identify differences between counties and highlights areas where additional resources, services, or public health interventions may be needed."
+  },
+  {
+    "objectID": "index.html#project-objectives",
+    "href": "index.html#project-objectives",
+    "title": "Illinois County Public Health Analysis",
+    "section": "Project Objectives",
+    "text": "Project Objectives\n\nExamine community health priorities: Compare hospital-identified health needs across Illinois counties.\nExplore healthcare access: Investigate the distribution of healthcare resources and hospitals.\nAssess geographic differences: Explore how rurality, poverty, and population characteristics relate to county-level health patterns.\nSupport public health planning: Present data in an accessible format to help inform discussions about community needs and resource allocation."
+  },
+  {
+    "objectID": "index.html#project-report-and-documentation",
+    "href": "index.html#project-report-and-documentation",
+    "title": "Illinois County Public Health Analysis",
+    "section": "Project Report and Documentation",
+    "text": "Project Report and Documentation\nThe report provides additional information about the project background, data sources, methodology, analytical approach, and findings."
+  },
+  {
+    "objectID": "index.html#interactive-gis-map",
+    "href": "index.html#interactive-gis-map",
+    "title": "Illinois County Public Health Analysis",
+    "section": "Interactive GIS Map",
+    "text": "Interactive GIS Map\nExplore the interactive map below to examine county-level health indicators and geographic patterns across Illinois. Use the map’s available controls to explore the data layers and compare information across counties."
+  },
+  {
+    "objectID": "index.html#data-considerations",
+    "href": "index.html#data-considerations",
+    "title": "Illinois County Public Health Analysis",
+    "section": "Data Considerations",
+    "text": "Data Considerations\nData availability varies across counties and hospitals. Some organizations did not have available Community Health Needs Assessments or complete data, and reporting periods may differ between sources. These limitations may affect county comparisons and should be considered when interpreting the results.\nThe analyses are intended to describe geographic patterns and explore potential relationships, rather than establish causation."
+  }
+]

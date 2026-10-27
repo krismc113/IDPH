@@ -424,7 +424,7 @@ county_indicators <- county_long %>%
 # Assumes chnaclean has County and Priority columns
 # named Priority 1, Priority 2, etc.
 
-hospital_long <- chnaclean %>%
+hospital_long <- data %>%
   pivot_longer(
     cols = starts_with("Priority"),
     names_to = "Priority_Number",

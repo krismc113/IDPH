@@ -1,12 +1,17 @@
 
 project:
   type: website
+  render:
+    - index.qmd
+  resources:
+    - "*.pdf"
+    - "*.html"
 
 website:
-  title: "Illinois Public Health Interactive Data"
+  title: "Illinois Hospital CHNA and County IPLAN Comparison"
   navbar:
     left:
-      - text: "Home"
+      - text: Home
         href: index.qmd
 
 format:
