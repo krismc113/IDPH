@@ -1,4 +1,5 @@
 
+
 name: Publish Quarto Website
 
 on:
@@ -28,6 +29,8 @@ jobs:
 
       - name: Render website
         uses: quarto-dev/quarto-actions/render@v2
+        with:
+          to: html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
