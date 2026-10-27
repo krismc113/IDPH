@@ -1,0 +1,55 @@
+---
+title: "Illinois County Public Health Analysis"
+subtitle: "Exploring Community Health Needs, Healthcare Access, and Geographic Inequities"
+format:
+  html:
+    theme: cosmo
+    toc: false
+    page-layout: full
+---
+
+## About the Project
+
+This project examines county-level public health needs and healthcare resources across Illinois. By bringing together hospital Community Health Needs Assessments (CHNAs), local health department priorities, population characteristics, and geographic data, the analysis explores how community health needs vary across the state.
+
+The project focuses on understanding patterns in healthcare access, community health priorities, rurality, and socioeconomic conditions. Geographic visualization helps identify differences between counties and highlights areas where additional resources, services, or public health interventions may be needed.
+
+## Project Objectives
+
+- **Examine community health priorities:** Compare hospital-identified health needs across Illinois counties.
+- **Explore healthcare access:** Investigate the distribution of healthcare resources and hospitals.
+- **Assess geographic differences:** Explore how rurality, poverty, and population characteristics relate to county-level health patterns.
+- **Support public health planning:** Present data in an accessible format to help inform discussions about community needs and resource allocation.
+
+## Project Report and Documentation
+
+The report provides additional information about the project background, data sources, methodology, analytical approach, and findings.
+
+<iframe
+  src="IDPH_CHNA_IPLAN_Updated.pdf"
+  width="100%"
+  height="650"
+  style="border: 1px solid #ddd;"
+  title="Illinois Hospital CHNA and County IPLAN Report">
+</iframe>
+
+
+## Interactive GIS Map
+
+Explore the interactive map below to examine county-level health indicators and geographic patterns across Illinois. Use the map's available controls to explore the data layers and compare information across counties.
+
+<iframe
+  src="Illinois_County_Health_Leaflet-2.html"
+  title="Interactive Illinois County Health GIS Map"
+  width="100%"
+  height="750"
+  style="border: 1px solid #d9dee7; border-radius: 8px;"
+  loading="lazy">
+</iframe>
+
+## Data Considerations
+
+Data availability varies across counties and hospitals. Some organizations did not have available Community Health Needs Assessments or complete data, and reporting periods may differ between sources. These limitations may affect county comparisons and should be considered when interpreting the results.
+
+The analyses are intended to describe geographic patterns and explore potential relationships, rather than establish causation.
+
