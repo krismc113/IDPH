@@ -1,0 +1,842 @@
+---
+title: "CHNA and IPLAN Comparision"
+format: html
+editor: visual
+---
+
+## Packages
+
+```{r}
+
+library(tidyverse)
+library(patchwork)
+library(grid)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(broom)
+library(betareg)
+library(maps)
+library(sf)
+
+```
+
+## Data
+
+```{r, analysis-data}
+
+chna_data <- data %>%
+  rename_with(
+    ~ paste0("CHNA_", .x),
+    starts_with("Priority")
+  )
+
+iplan_data <- data1 %>%
+  rename_with(
+    ~ paste0("IPLAN_", .x),
+    starts_with("Priority")
+  )
+
+analysis_data <- full_join(
+  chna_data,
+  iplan_data,
+  by = "County",
+  suffix = c("_CHNA", "_IPLAN")
+)
+
+
+```
+
+## Combine Data
+
+```{r, combine-data}
+
+chna_cols <- paste0("CHNA_Priority ", 1:5)
+iplan_cols <- paste0("IPLAN_Priority ", 1:5)
+
+analysis_data <- analysis_data %>%
+  rowwise() %>%
+  mutate(
+    Shared_Priorities = length(intersect(
+      unique(na.omit(c_across(all_of(chna_cols)))),
+      unique(na.omit(c_across(all_of(iplan_cols))))
+    )),
+
+    Total_Distinct_Priorities = length(union(
+      unique(na.omit(c_across(all_of(chna_cols)))),
+      unique(na.omit(c_across(all_of(iplan_cols))))
+    )),
+
+    Priority_Overlap_Percent = if_else(
+      Total_Distinct_Priorities > 0,
+      (Shared_Priorities / Total_Distinct_Priorities) * 100,
+      NA_real_
+    )
+  ) %>%
+  ungroup()
+
+```
+
+## Descriptive Statistics
+
+```{r, descriptive-statistics}
+
+summary(analysis_data$Priority_Overlap_Percent)
+
+mean(analysis_data$Priority_Overlap_Percent, na.rm = TRUE)
+
+sd(analysis_data$Priority_Overlap_Percent, na.rm = TRUE)
+
+```
+## CHNA vs. IPLAN Priorities
+
+```{r, chna-iplan-plot}
+
+# Hospital CHNA topic counts
+chna_counts <- analysis_data %>%
+  select(County, starts_with("CHNA_Priority")) %>%
+  pivot_longer(
+    cols = starts_with("CHNA_Priority"),
+    values_to = "Topic"
+  ) %>%
+  filter(!is.na(Topic), Topic != "") %>%
+  distinct(County, Topic) %>%
+  count(Topic, name = "CHNA_Count")
+
+# County IPLAN topic counts
+iplan_counts <- analysis_data %>%
+  select(County, starts_with("IPLAN_Priority")) %>%
+  distinct(County, .keep_all = TRUE) %>%
+  pivot_longer(
+    cols = starts_with("IPLAN_Priority"),
+    values_to = "Topic"
+  ) %>%
+  filter(!is.na(Topic), Topic != "") %>%
+  distinct(County, Topic) %>%
+  count(Topic, name = "IPLAN_Count")
+
+# Combine counts
+topic_comparison <- full_join(
+  chna_counts, iplan_counts, by = "Topic"
+) %>%
+  mutate(
+    CHNA_Count = replace_na(CHNA_Count, 0L),
+    IPLAN_Count = replace_na(IPLAN_Count, 0L)
+  )
+
+# Graph
+chna_iplan_plot <- topic_comparison %>%
+  pivot_longer(
+    cols = c(CHNA_Count, IPLAN_Count),
+    names_to = "Source",
+    values_to = "Count"
+  ) %>%
+  ggplot(aes(x = reorder(Topic, Count),
+             y = Count, fill = Source)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(
+    title = "Hospital CHNA vs. County IPLAN Priorities",
+    x = "Health Topic",
+    y = "Number of Counties",
+    fill = "Source"
+  ) +
+  theme_minimal()
+
+chna_iplan_plot 
+
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/chna_iplan_plot.png",
+  plot = chna_iplan_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+## Multiple Linear Regression
+
+```{r, miltiple-linear-regression}
+
+mlrmodel <- lm(
+  Priority_Overlap_Percent ~ Population +
+    `Number of Hospitals with CHNAS` +
+    Rurality +
+    `County Poverty`,
+  data = analysis_data
+)
+
+summary(mlrmodel)
+
+mlr_plot <- ggplot(analysis_data,
+       aes(x = Population, y = Priority_Overlap_Percent)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "County Population and Priority Overlap",
+    x = "County Population",
+    y = "Priority Overlap (%)"
+  ) +
+  theme_minimal()
+
+mlr_plot
+
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/mlr_plot.png",
+  plot = mlr_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+
+## Priority Overlap Odd Ratio
+
+```{r, priorit-overlap}
+
+# 2. Clean numeric columns (removing commas from Population and County Poverty)
+analysis_data$Population_num <- as.numeric(gsub(",", "", analysis_data$Population))
+analysis_data$Poverty_num <- as.numeric(gsub(",", "", analysis_data$`County Poverty`))
+
+# 3. Define CHNA and IPLAN columns based on your naming convention
+chna_cols <- paste0("CHNA_Priority ", 1:5)
+iplan_cols <- paste0("IPLAN_Priority ", 1:5)
+
+# If your actual columns are named differently (e.g., "Priority 1" through "Priority 5"), 
+# make sure they match your data frame. Here is your exact snippet integrated:
+overlap <- analysis_data %>%
+  rowwise() %>%
+  mutate(
+    Shared_Priorities = length(intersect(
+      na.omit(c_across(all_of(chna_cols))),
+      na.omit(c_across(all_of(iplan_cols)))
+    )),
+    Total_Distinct_Priorities = length(union(
+      na.omit(c_across(all_of(chna_cols))),
+      na.omit(c_across(all_of(iplan_cols)))
+    )),
+    Priority_Overlap_Percent = if_else(
+      Total_Distinct_Priorities > 0,
+      Shared_Priorities / Total_Distinct_Priorities * 100,
+      NA_real_
+    )
+  ) %>%
+  ungroup()
+
+# 4. Create complete cases subset
+vars_to_use <- c("Priority_Overlap_Percent", "Population_num", "Number of Hospitals with CHNAS", "Rurality", "Poverty_num")
+analysis_clean <- analysis_data[complete.cases(analysis_data[, vars_to_use]), ]
+
+# 5. Scale continuous predictors to fix numerical instability
+analysis_clean$scaled_population <- scale(analysis_clean$Population_num)
+analysis_clean$scaled_poverty <- scale(analysis_clean$Poverty_num)
+analysis_clean$scaled_hospitals <- scale(analysis_clean$`Number of Hospitals with CHNAS`)
+
+# 6. Transform percentage to strict 0-1 bounds for Beta regression
+n <- nrow(analysis_clean)
+analysis_clean$overlap_prop_adj <- (analysis_clean$Priority_Overlap_Percent / 100 * (n - 1) + 0.5) / n
+
+# 7. Fit Beta Regression model
+model <- betareg(
+  overlap_prop_adj ~ scaled_population + scaled_hospitals + Rurality + scaled_poverty,
+  data = analysis_clean
+)
+
+summary(model)
+
+# 8. Generate clean forest plot with constrained x-axis limits
+coef_df <- data.frame(
+  Predictor = c("County Population", "Number of Hospitals with CHNAS", "County Rurality", "County Poverty"),
+  Estimate = exp(coef(model)[c("scaled_population", "scaled_hospitals", "Rurality", "scaled_poverty")]),
+  Lower = exp(confint(model)[c("scaled_population", "scaled_hospitals", "Rurality", "scaled_poverty"), 1]),
+  Upper = exp(confint(model)[c("scaled_population", "scaled_hospitals", "Rurality", "scaled_poverty"), 2])
+)
+
+priority_overlap_plot <- ggplot(coef_df, aes(x = Estimate, y = Predictor)) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.2) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_log10() +
+  coord_cartesian(xlim = c(0.1, 10)) +
+  labs(
+    title = "Factors Associated with County–Hospital Priority Overlap",
+    subtitle = "Beta regression with 95% confidence intervals",
+    x = "Odds Ratio / Effect Size (log scale)",
+    y = "Predictor"
+  ) +
+  theme_minimal()
+
+priority_overlap_plot
+
+```
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/priority_overlap_plot.png",
+  plot = priority_overlap_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+
+## Hopsital Density and County Rurality
+
+```{r, hospital-rurality}
+
+chna_rurality_plot <- ggplot(analysis_clean, aes(x = Rurality, y = `Number of Hospitals with CHNAS`)) +
+  geom_jitter(width = 0.2, height = 0.1, size = 2.5, color = "darkblue", alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", fill = "pink", alpha = 0.3) +
+  scale_x_continuous(breaks = 1:9) +
+  labs(
+    title = "Hospital Density vs. County Rurality",
+    subtitle = "Linear regression fit (higher rurality score = more rural)",
+    x = "Rurality Score (1 = Least Rural, 9 = Most Rural)",
+    y = "Number of Hospitals with CHNAS"
+  ) +
+  theme_minimal()
+
+chna_rurality_plot
+
+```
+
+```{r, chna-rurality-odds-ratio}
+
+# 2. Subset complete cases for Rurality and Hospital Density
+vars_to_use <- c("Rurality", "Number of Hospitals with CHNAS")
+analysis_clean_subset <- analysis_data[complete.cases(analysis_data[, vars_to_use]), ]
+
+# 3. Fit Poisson regression model (ideal for count outcomes like hospital count)
+# This gives Rate Ratios / Odds-like effect sizes upon exponentiation
+poisson_model <- glm(`Number of Hospitals with CHNAS` ~ Rurality, 
+                     data = analysis_clean_subset, 
+                     family = poisson(link = "log"))
+summary(poisson_model)
+
+# 4. Extract exponentiated coefficients (Incidence Rate Ratios) and 95% CIs
+coef_df <- data.frame(
+  Predictor = "County Rurality",
+  Estimate = exp(coef(poisson_model)["Rurality"]),
+  Lower = exp(confint(poisson_model)["Rurality", 1]),
+  Upper = exp(confint(poisson_model)["Rurality", 2])
+)
+
+# 5. Generate forest plot in odds-ratio / rate-ratio format
+chna_rurality_or_plot <- ggplot(coef_df, aes(x = Estimate, y = Predictor)) +
+  geom_point(size = 4, color = "darkblue") +
+  geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.2, linewidth = 1, color = "darkblue") +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
+  scale_x_log10() +
+  coord_cartesian(xlim = c(0.5, 1.5)) +
+  labs(
+    title = "Effect of County Rurality on Hospital Density",
+    subtitle = "Poisson regression Incidence Rate Ratio (log scale)",
+    x = "Rate Ratio / Effect Size (95% CI)",
+    y = ""
+  ) +
+  theme_minimal()
+
+chna_rurality_or_plot
+
+```
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/chna_rurality_plot.png",
+  plot = chna_rurality_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+ggsave(
+  filename = "graph/chna_rurality_or_plot.png",
+  plot = chna_rurality_or_plot
+,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+
+## Priorities: Behavioral and Mental Health and Chronic Disease Management
+
+```{r, behavioral-chronic}
+
+# ------------------------------------------
+# 1. CREATE COUNTY IPLAN PRIORITY INDICATORS
+# ------------------------------------------
+
+county_long <- data1 %>%
+  pivot_longer(
+    cols = starts_with("Priority"),
+    names_to = "Priority_Number",
+    values_to = "Topic"
+  ) %>%
+  filter(!is.na(Topic), Topic != "")
+
+county_indicators <- county_long %>%
+  mutate(
+    Behavioral = as.integer(str_detect(
+      str_to_lower(Topic),
+      "behavioral and mental health|behavioral health|mental health"
+    )),
+    Chronic = as.integer(str_detect(
+      str_to_lower(Topic),
+      "chronic disease management|chronic disease"
+    ))
+  ) %>%
+  group_by(County) %>%
+  summarise(
+    County_Behavioral = max(Behavioral),
+    County_Chronic = max(Chronic),
+    .groups = "drop"
+  )
+
+
+# ------------------------------------------
+# 2. CREATE HOSPITAL CHNA PRIORITY INDICATORS
+# ------------------------------------------
+# Assumes chnaclean has County and Priority columns
+# named Priority 1, Priority 2, etc.
+
+hospital_long <- chnaclean %>%
+  pivot_longer(
+    cols = starts_with("Priority"),
+    names_to = "Priority_Number",
+    values_to = "Topic"
+  ) %>%
+  filter(!is.na(Topic), Topic != "")
+
+hospital_indicators <- hospital_long %>%
+  mutate(
+    Behavioral = as.integer(str_detect(
+      str_to_lower(Topic),
+      "behavioral and mental health|behavioral health|mental health"
+    )),
+    Chronic = as.integer(str_detect(
+      str_to_lower(Topic),
+      "chronic disease management|chronic disease"
+    ))
+  ) %>%
+  group_by(County) %>%
+  summarise(
+    Hospital_Behavioral = max(Behavioral),
+    Hospital_Chronic = max(Chronic),
+    .groups = "drop"
+  )
+
+
+# ------------------------------------------
+# 3. COMBINE DATA BY COUNTY
+# ------------------------------------------
+
+analysis_data <- county_indicators %>%
+  full_join(hospital_indicators, by = "County") %>%
+  left_join(
+    analysis_data %>%
+      select(
+        County, Population,
+        `Number of Hospitals with CHNAS`,
+        Rurality, `County Poverty`
+      ) %>%
+      distinct(County, .keep_all = TRUE),
+    by = "County"
+  )
+
+# Remove counties without known priority information
+analysis_data <- analysis_data %>%
+  filter(
+    !is.na(County_Behavioral),
+    !is.na(Hospital_Behavioral),
+    !is.na(County_Chronic),
+    !is.na(Hospital_Chronic)
+  )
+
+
+# ------------------------------------------
+# 4. BEHAVIORAL AND MENTAL HEALTH REGRESSION
+# ------------------------------------------
+# One model comparing county and hospital inclusion.
+# Outcome: whether the county IPLAN includes the priority.
+# Hospital inclusion is an explanatory variable.
+
+behavioral_model <- glm(
+  County_Behavioral ~ Hospital_Behavioral +
+    Population + `Number of Hospitals with CHNAS` +
+    Rurality + `County Poverty`,
+  data = analysis_data,
+  family = binomial
+)
+
+summary(behavioral_model)
+
+
+# ------------------------------------------
+# 5. CHRONIC DISEASE MANAGEMENT REGRESSION
+# ------------------------------------------
+
+chronic_model <- glm(
+  County_Chronic ~ Hospital_Chronic +
+    Population + `Number of Hospitals with CHNAS` +
+    Rurality + `County Poverty`,
+  data = analysis_data,
+  family = binomial
+)
+
+summary(chronic_model)
+
+
+# ------------------------------------------
+# 6. GRAPH FUNCTION: ODDS RATIOS
+# ------------------------------------------
+
+
+make_or_plot <- function(model, graph_title) {
+
+  results <- broom::tidy(model) %>%
+    dplyr::filter(term != "(Intercept)") %>%
+    dplyr::mutate(
+      OR = exp(estimate),
+      Lower = exp(estimate - 1.96 * std.error),
+      Upper = exp(estimate + 1.96 * std.error),
+      Variable = dplyr::case_when(
+        term %in% c("Hospital_Behavioral", "Hospital_Chronic") ~
+          "Hospital CHNA includes priority",
+        term == "Population" ~ "County population",
+        term == "Number of Hospitals with CHNAS" ~
+          "Number of hospitals with CHNAs",
+        term == "Rurality" ~ "County rurality",
+        term == "County Poverty" ~ "County poverty",
+        TRUE ~ term
+      )
+    )
+
+  ggplot2::ggplot(
+    results,
+    ggplot2::aes(x = OR, y = reorder(Variable, OR))
+  ) +
+    ggplot2::geom_point(size = 3) +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(xmin = Lower, xmax = Upper),
+      orientation = "y",
+      width = 0.2
+    ) +
+    ggplot2::geom_vline(
+      xintercept = 1,
+      linetype = "dashed"
+    ) +
+    ggplot2::scale_x_log10() +
+    ggplot2::labs(
+      title = graph_title,
+      x = "Odds Ratio (log scale)",
+      y = "Predictor"
+    ) +
+    ggplot2::theme_minimal()
+}
+
+# Graph 1
+behavioral_plot <- make_or_plot(
+  behavioral_model,
+  "Factors Associated with Behavioral and Mental Health Priorities"
+)
+
+behavioral_plot
+
+# Graph 2
+chronic_plot <- make_or_plot(
+  chronic_model,
+  "Factors Associated with Chronic Disease Management Priorities"
+)
+
+chronic_plot
+
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/chronic_plot.png",
+  plot = chronic_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+ggsave(
+  filename = "graph/behavioral_plot.png",
+  plot = behavioral_plot
+,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+
+## Hopsital Density and County Poverty
+
+```{r, hospital-poverty}
+
+chna_poverty_plot <- ggplot(
+  analysis_clean,
+  aes(x = `Number of Hospitals with CHNAS`, y = Poverty_num)
+) +
+  geom_point(
+    color = "darkblue",
+    size = 2.5,
+    alpha = 0.7
+  ) +
+  geom_smooth(
+    method = "lm",
+    color = "red",
+    fill = "pink",
+    alpha = 0.3
+  ) +
+  labs(
+    title = "Number of Hospitals with CHNAs vs. County Poverty Rate",
+    subtitle = "Linear regression fit",
+    x = "Number of Hospitals with CHNAs",
+    y = "County Poverty Rate (%)"
+  ) +
+  theme_minimal()
+
+chna_poverty_plot
+
+```
+
+```{r, chna-poverty-odds-ratio}
+
+# 1. Subset complete cases
+vars_to_use <- c("Poverty_num", "Number of Hospitals with CHNAS")
+
+analysis_clean_subset <- analysis_data[
+  complete.cases(analysis_data[, vars_to_use]),
+]
+
+# 2. Fit Poisson regression model
+poisson_model <- glm(
+  `Number of Hospitals with CHNAS` ~ Poverty_num,
+  data = analysis_clean_subset,
+  family = poisson(link = "log")
+)
+
+summary(poisson_model)
+
+# 3. Extract Incidence Rate Ratio and 95% confidence interval
+coef_df <- data.frame(
+  Predictor = "County Poverty",
+  Estimate = exp(coef(poisson_model)["Poverty_num"]),
+  Lower = exp(confint.default(poisson_model)["Poverty_num", 1]),
+  Upper = exp(confint.default(poisson_model)["Poverty_num", 2])
+)
+
+# 4. Create forest plot
+chna_poverty_or_plot <- ggplot(
+  coef_df,
+  aes(x = Estimate, y = Predictor)
+) +
+  geom_point(size = 4, color = "darkblue") +
+  geom_errorbar(
+    aes(xmin = Lower, xmax = Upper),
+    width = 0.15,
+    linewidth = 1,
+    color = "darkblue"
+  ) +
+  geom_vline(
+    xintercept = 1,
+    linetype = "dashed",
+    color = "gray40"
+  ) +
+  scale_x_log10() +
+  labs(
+    title = "Association Between County Poverty and Hospital Count",
+    subtitle = "Poisson regression: Incidence Rate Ratio with 95% CI",
+    x = "Incidence Rate Ratio (log scale)",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 12)
+
+# 5. Display plot
+chna_poverty_or_plot
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/chna_poverty_plot.png",
+  plot = chna_poverty_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+ggsave(
+  filename = "graph/chna_poverty_or_plot.png",
+  plot = chna_poverty_or_plot
+,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+
+## First Priority and County Poverty
+
+```{r, one-priority-poverty}
+
+poverty_data <- analysis_data %>%
+  filter(!is.na("CHNA_Priority 1"), !is.na(Poverty_num))
+
+# Categorize poverty into low and high groups using the median
+poverty_data <- poverty_data %>%
+  mutate(
+    Poverty_Group = ifelse(
+      Poverty_num >= median(Poverty_num, na.rm = TRUE),
+      "Higher Poverty",
+      "Lower Poverty"
+    )
+  )
+
+# Cross-tabulation
+poverty_table <- table(
+  poverty_data$`CHNA_Priority 1`,
+  poverty_data$Poverty_Group
+)
+
+print(poverty_table)
+
+# Chi-square test
+chisq.test(poverty_table)
+
+# Plot
+priority_poverty_plot <- ggplot(poverty_data, aes(x = Poverty_Group, fill = `CHNA_Priority 1`)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "First CHNA Priority by County Poverty Level",
+    x = "County Poverty Group",
+    y = "Proportion of Counties",
+    fill = "First CHNA Priority"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+priority_poverty_plot
+
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/priority_poverty_plot.png",
+  plot = priority_poverty_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+## 1st Priority and Rurality
+
+```{r, one-priority-rurality}
+
+# 1. Remove missing values
+rurality_data <- analysis_data %>%
+  filter(
+    !is.na(`CHNA_Priority 1`),
+    !is.na(Rurality)
+  )
+
+# 2. Group rurality scores
+rurality_data <- rurality_data %>%
+  mutate(
+    Rurality_Group = case_when(
+      Rurality >= 1 & Rurality <= 3 ~ "Urban",
+      Rurality >= 4 & Rurality <= 6 ~ "Suburban",
+      Rurality >= 7 & Rurality <= 10 ~ "Rural",
+      TRUE ~ NA_character_
+    ),
+    Rurality_Group = factor(
+      Rurality_Group,
+      levels = c("Urban", "Suburban", "Rural")
+    )
+  ) %>%
+  filter(!is.na(Rurality_Group))
+
+# 3. Cross-tabulation
+rurality_table <- table(
+  rurality_data$`CHNA_Priority 1`,
+  rurality_data$Rurality_Group
+)
+
+print(rurality_table)
+
+# 4. Chi-square test
+chisq.test(rurality_table)
+
+# 5. Plot
+priority_rurality_plot <- ggplot(
+  rurality_data,
+  aes(x = Rurality_Group, fill = `CHNA_Priority 1`)
+) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "First CHNA Priority by County Rurality",
+    x = "County Rurality",
+    y = "Proportion of Counties",
+    fill = "First CHNA Priority"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+priority_rurality_plot
+
+```
+
+## Save
+
+```{r, save}
+
+ggsave(
+  filename = "graph/priority_rurality_plot.png",
+  plot = priority_rurality_plot,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+
+```

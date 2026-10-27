@@ -1,0 +1,588 @@
+---
+title: "GIS"
+format: html
+editor: visual
+---
+
+## Packages
+
+```{r}
+
+library(tidyverse)
+library(patchwork)
+library(grid)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(broom)
+library(betareg)
+library(maps)
+library(sf)
+library(leaflet)
+
+```
+
+## Map Layer
+
+```{r}
+
+illinois <- maps::map(
+  database = "state",
+  regions = "illinois",
+  plot = FALSE,
+  fill = TRUE
+) %>%
+  st_as_sf() %>%
+  rename(
+    state_name = ID
+  )
+
+ggplot(
+  data = illinois
+) +
+  geom_sf(
+    fill = "grey95",
+    color = "white",
+    linewidth = 0.3
+  ) +
+  labs(
+    title = "Geographic Information Systems for Illinois",
+    caption = "Boundary data: maps R package"
+  ) +
+  theme_void()
+
+ilco <- maps::map(
+  database = "county",
+  regions = "illinois",
+  plot = FALSE,
+  fill = TRUE
+) %>%
+  st_as_sf() %>%
+  rename(
+    county_id = ID
+  ) %>%
+  mutate(
+    county_name = str_remove(
+      county_id,
+      "^illinois,"
+    ),
+    county_name = str_to_title(
+      county_name
+    )
+  )
+
+ggplot(
+  data = ilco
+) +
+  geom_sf(
+    fill = "#F3F4F6",
+    color = "white",
+    linewidth = 0.25
+  ) +
+  labs(
+    title = "Geographic Information Systems for Illinois",
+    caption = "Boundary data: maps R package"
+  ) +
+  theme_void()
+
+```
+## Rurality Layer
+
+```{r}
+
+analysis_data1 <- analysis_data %>%
+  mutate(
+    Rurality_Category = ntile(Rurality, 3),
+    Rurality_Category = factor(
+      Rurality_Category,
+      levels = c(1, 2, 3),
+      labels = c("Urban", "Suburban", "Rural")
+    )
+  )
+
+ilco <- ilco %>%
+  select(-any_of("Rurality_Category")) %>%
+  left_join(
+    analysis_data1 %>%
+      select(County, Rurality_Category) %>%
+      distinct(County, .keep_all = TRUE),
+    by = c("county_name" = "County")
+  )
+
+ggplot(data = ilco) +
+  geom_sf(
+    aes(fill = Rurality_Category),
+    color = "white",
+    linewidth = 0.25
+  ) +
+  scale_fill_manual(
+  values = c(
+    "Urban" = "#C6DBEF",
+    "Suburban" = "#6BAED6",
+    "Rural" = "#2171B5"
+  ),
+  na.value = "grey90"
+) +
+  labs(
+    title = "Rurality Across Illinois Counties",
+    fill = "Rurality",
+    caption = "Boundary data: maps R package"
+  ) +
+  theme_void()
+
+```
+## Layers
+
+```{r}
+
+ilco <- ilco %>%
+  select(-any_of(c(
+    "County Population",
+    "County Poverty",
+    "Number of Hospitals with CHNAS"
+  ))) %>%
+  left_join(
+    analysis_data %>%
+      select(
+        County,
+        `Population`,
+        `County Poverty`,
+        `Number of Hospitals with CHNAS`
+      ) %>%
+      distinct(County, .keep_all = TRUE),
+    by = c("county_name" = "County")
+  )
+
+```
+
+
+## Population Layer
+
+```{r, population}
+
+ggplot(ilco) +
+  geom_sf(aes(fill = Population), color = "white", linewidth = 0.25) +
+  scale_fill_gradient(
+    low = "#E5F5E0",
+    high = "#238B45",
+    na.value = "grey90"
+  ) +
+  labs(
+    title = "Illinois County Population",
+    fill = "Population"
+  ) +
+  theme_void()
+
+```
+## Poverty
+
+```{r, poverty}
+
+ggplot(ilco) +
+  geom_sf(aes(fill = `County Poverty`), color = "white", linewidth = 0.25) +
+  scale_fill_gradient(
+  low = "#FEE6CE",
+  high = "#D94801",
+  na.value = "grey90"
+) +
+  labs(title = "Illinois County Poverty", fill = "Poverty") +
+  theme_void()
+
+```
+## CHNAS
+
+```{r, chnas}
+ 
+ggplot(ilco) +
+  geom_sf(
+    aes(fill = `Number of Hospitals with CHNAS`),
+    color = "white",
+    linewidth = 0.25
+  ) +
+  scale_fill_gradient(
+  low = "#EFEDF5",
+  high = "#756BB1",
+  na.value = "grey90"
+) +
+  labs(
+    title = "Illinois Hospitals with CHNAs by County",
+    fill = "Number of Hospitals with CHNAs"
+  ) +
+  theme_void()
+  
+```
+## Priorities
+
+```{r, priorities}
+
+ilco <- ilco %>%
+  select(-any_of(c(
+    "Priority_CHNA_1", "Priority_CHNA_2", "Priority_CHNA_3",
+    "Priority_CHNA_4", "Priority_CHNA_5",
+    "Priority_IPLAN_1", "Priority_IPLAN_2", "Priority_IPLAN_3",
+    "Priority_IPLAN_4", "Priority_IPLAN_5"
+  ))) %>%
+  left_join(
+    analysis_data %>%
+      select(
+        County,
+        starts_with("CHNA_Priority"),
+        starts_with("IPLAN_Priority")
+      ) %>%
+      distinct(County, .keep_all = TRUE),
+    by = c("county_name" = "County")
+  )
+
+```
+
+
+```{r, graph}
+ 
+# Identify all CHNA and IPLAN priority columns
+priority_cols <- grep(
+  "^(CHNA|IPLAN)_Priority",
+  names(ilco),
+  value = TRUE
+)
+
+# Function to create each priority map
+make_priority_map <- function(priority_col) {
+
+  ggplot(ilco) +
+    geom_sf(
+      aes(fill = .data[[priority_col]]),
+      color = "white",
+      linewidth = 0.25
+    ) +
+    labs(
+      title = paste(
+        "Illinois Counties:",
+        str_replace_all(priority_col, "_", " ")
+      ),
+      fill = "Priority",
+      caption = "County boundaries: maps R package"
+    ) +
+    theme_void()
+}
+
+# Display each priority map separately
+for (priority_col in priority_cols) {
+  print(make_priority_map(priority_col))
+}
+
+```
+
+## Combine
+
+```{r}
+
+# 1. Use your existing data
+counties <- ilco
+
+# 2. Check columns
+print(names(counties))
+print(nrow(counties))
+
+# 3. Define indicators
+indicators <- c(
+  "Population",
+  "County Poverty",
+  "Number of Hospitals with CHNAS",
+  "Rurality_Category",
+  paste0("CHNA_Priority ", 1:5),
+  paste0("IPLAN_Priority ", 1:5)
+)
+
+indicators <- indicators[indicators %in% names(counties)]
+
+if (!length(indicators)) {
+  stop("None of the indicator names match ilco. Check names(counties).")
+}
+
+if (!"county_name" %in% names(counties)) {
+  stop("The county_name column is missing.")
+}
+
+# 4. Prepare data for JavaScript
+attributes <- st_drop_geometry(counties)
+
+attributes[] <- lapply(attributes, function(x) {
+  if (inherits(x, "factor")) as.character(x) else x
+})
+
+attributes$county_name <- as.character(attributes$county_name)
+attributes <- attributes[!duplicated(attributes$county_name), ]
+
+records <- lapply(seq_len(nrow(attributes)), function(i) {
+  as.list(attributes[i, , drop = FALSE])
+})
+
+names(records) <- attributes$county_name
+
+records_json <- jsonlite::toJSON(
+  records,
+  auto_unbox = TRUE,
+  na = "null",
+  dataframe = "rows",
+  null = "null",
+  digits = NA
+)
+
+fields_json <- jsonlite::toJSON(indicators, auto_unbox = FALSE)
+
+# 5. Create map
+map <- leaflet(counties) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(
+    layerId = ~county_name,
+    group = "Counties",
+    color = "#FFFFFF",
+    weight = 0.7,
+    fillColor = "#9ECAE1",
+    fillOpacity = 0.85,
+    label = ~county_name
+  ) %>%
+  fitBounds(
+    lng1 = -91.6, lat1 = 36.9,
+    lng2 = -87.4, lat2 = 42.6
+  )
+
+# 6. Add dropdown, map coloring, and dynamic legend
+js <- sprintf(
+"
+function(el, x) {
+  var map = this;
+  var records = %s;
+  var fields = %s;
+
+  var colors = [
+    '#ffffcc', '#c2e699', '#78c679',
+    '#31a354', '#006837'
+  ];
+
+  var categoricalColors = [
+    '#4E79A7', '#F28E2B', '#E15759',
+    '#76B7B2', '#59A14F', '#B07AA1',
+    '#9C755F', '#EDC948', '#FF9DA7'
+  ];
+
+  function getValue(name, field) {
+    return records[name] ? records[name][field] : null;
+  }
+
+  function numericValues(field) {
+    return Object.keys(records)
+      .map(function(name) {
+        var v = getValue(name, field);
+        return v !== null && v !== '' &&
+          typeof v === 'number' && isFinite(v) ? v : null;
+      })
+      .filter(function(v) { return v !== null; })
+      .sort(function(a, b) { return a - b; });
+  }
+
+  function isNumericField(field) {
+    return numericValues(field).length > 0 &&
+      Object.keys(records).some(function(name) {
+        var v = getValue(name, field);
+        return typeof v === 'number' && isFinite(v);
+      });
+  }
+
+  function categoryList(field) {
+    return Array.from(new Set(
+      Object.keys(records).map(function(name) {
+        var v = getValue(name, field);
+        return v === null || v === undefined || v === ''
+          ? 'Missing' : String(v);
+      })
+    )).sort();
+  }
+
+  function colorFor(value, values) {
+    if (value === null || value === undefined || value === '') {
+      return '#d9d9d9';
+    }
+
+    if (isNumericField(selectedField) &&
+        typeof value === 'number' && values.length) {
+      var rank = values.filter(function(v) {
+        return v <= value;
+      }).length / values.length;
+
+      return colors[Math.min(4, Math.floor(rank * 5))];
+    }
+
+    var categories = categoryList(selectedField);
+    var index = categories.indexOf(String(value));
+
+    return categoricalColors[
+      (index < 0 ? 0 : index) %% categoricalColors.length
+    ];
+  }
+
+  var selectedField = fields[0];
+
+  // Dropdown control
+  var control = L.control({position: 'topright'});
+
+  control.onAdd = function() {
+    var div = L.DomUtil.create('div', 'leaflet-bar');
+    div.style.background = 'white';
+    div.style.padding = '10px';
+    div.style.minWidth = '220px';
+
+    var label = document.createElement('label');
+    label.textContent = 'County Health Indicator';
+    label.style.display = 'block';
+    label.style.fontWeight = 'bold';
+    label.style.marginBottom = '6px';
+
+    var select = document.createElement('select');
+    select.style.width = '220px';
+    select.style.padding = '5px';
+
+    fields.forEach(function(field) {
+      var option = document.createElement('option');
+      option.value = field;
+      option.textContent = field;
+      select.appendChild(option);
+    });
+
+    select.addEventListener('change', function() {
+      selectedField = this.value;
+      updateMap();
+    });
+
+    div.appendChild(label);
+    div.appendChild(select);
+    L.DomEvent.disableClickPropagation(div);
+
+    return div;
+  };
+
+  control.addTo(map);
+
+  // Dynamic legend
+  var legend = L.control({position: 'bottomright'});
+
+  legend.onAdd = function() {
+    var div = L.DomUtil.create('div', 'info legend');
+    div.style.background = 'white';
+    div.style.padding = '10px';
+    div.style.borderRadius = '5px';
+    div.style.boxShadow = '0 1px 5px rgba(0,0,0,0.4)';
+    div.style.lineHeight = '20px';
+    div.style.maxWidth = '240px';
+    div.style.maxHeight = '250px';
+    div.style.overflowY = 'auto';
+    return div;
+  };
+
+  legend.addTo(map);
+
+  function updateLegend(values) {
+    var div = legend.getContainer();
+    var html = '<b>' + selectedField + '</b><br>';
+
+    html += '<i style=\"background:#d9d9d9;width:12px;height:12px;display:inline-block;margin-right:5px;\"></i> Missing<br>';
+
+    if (isNumericField(selectedField) && values.length) {
+      var min = values[0];
+      var max = values[values.length - 1];
+
+      for (var i = 0; i < colors.length; i++) {
+        var lower = min + (max - min) * i / 5;
+        var upper = min + (max - min) * (i + 1) / 5;
+
+        html += '<i style=\"background:' + colors[i] +
+          ';width:12px;height:12px;display:inline-block;margin-right:5px;\"></i> ' +
+          lower.toLocaleString(undefined, {maximumFractionDigits: 1}) +
+          '–' +
+          upper.toLocaleString(undefined, {maximumFractionDigits: 1}) +
+          '<br>';
+      }
+    } else {
+      var categories = categoryList(selectedField);
+
+      categories.forEach(function(category, i) {
+        if (category === 'Missing') return;
+
+        var color = categoricalColors[
+          i %% categoricalColors.length
+        ];
+
+        html += '<i style=\"background:' + color +
+          ';width:12px;height:12px;display:inline-block;margin-right:5px;\"></i> ' +
+          category + '<br>';
+      });
+    }
+
+    div.innerHTML = html;
+  }
+
+  // Update polygon colors, popups, and legend
+  function updateMap() {
+    var values = numericValues(selectedField);
+
+    map.eachLayer(function(layer) {
+      if (!layer.options || layer.options.layerId == null) return;
+
+      var name = String(layer.options.layerId);
+      if (!records[name]) return;
+
+      var value = getValue(name, selectedField);
+
+      layer.setStyle({
+        fillColor: colorFor(value, values),
+        fillOpacity: 0.85,
+        color: '#FFFFFF',
+        weight: 0.7
+      });
+
+      var content = '<b>' + name + '</b>';
+
+      fields.forEach(function(field) {
+        var v = getValue(name, field);
+        content += '<br><b>' + field + ':</b> ' +
+          (v === null || v === undefined ? 'Not available' : v);
+      });
+
+      layer.bindPopup(content);
+      layer.bindTooltip(
+        '<b>' + name + '</b><br>' + selectedField + ': ' +
+        (value === null || value === undefined ? 'Not available' : value)
+      );
+    });
+
+    updateLegend(values);
+  }
+
+  updateMap();
+}
+",
+  records_json,
+  fields_json
+)
+
+map <- htmlwidgets::onRender(map, js)
+
+# 7. Save the map
+output_path <- path.expand(
+  "~/Desktop/DataVisualization/Illinois_County_Health_Leaflet.html"
+)
+
+htmlwidgets::saveWidget(
+  map,
+  file = output_path,
+  selfcontained = TRUE
+)
+
+cat("Map saved to:", output_path, "\n")
+cat("Indicators included:", paste(indicators, collapse = ", "), "\n")
+
+```
+
+```
+
