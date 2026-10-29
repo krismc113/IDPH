@@ -1,0 +1,75 @@
+/*-- scss:defaults --*/
+$primary: #142D4E;
+$body-bg: #FFFFFF;
+$body-color: #26374A;
+$link-color: #142D4E;
+$headings-color: #142D4E;
+
+/*-- scss:rules --*/
+
+/* Main page */
+body {
+  background-color: #FFFFFF;
+  line-height: 1.7;
+}
+
+/* Navigation */
+.navbar {
+  background-color: #142D4E !important;
+}
+
+.navbar .navbar-brand,
+.navbar .nav-link {
+  color: #FFFFFF !important;
+}
+
+.navbar .nav-link:hover {
+  color: #EAF2FA !important;
+}
+
+/* Title banner */
+.quarto-title-banner {
+  background-color: #142D4E !important;
+  color: #FFFFFF !important;
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+}
+
+.quarto-title-banner .title,
+.quarto-title-banner .subtitle {
+  color: #FFFFFF !important;
+}
+
+/* Section headings */
+h2 {
+  color: #142D4E;
+  border-bottom: 2px solid #D5E1EF;
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+}
+
+/* Links */
+a {
+  color: #142D4E;
+}
+
+a:hover {
+  color: #456B96;
+}
+
+/* PDF and GIS frames */
+iframe {
+  display: block;
+  width: 100%;
+  background-color: #FFFFFF;
+  border: 1px solid #D5E1EF;
+  border-radius: 8px;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Selected text */
+::selection {
+  background: #D5E5F5;
+  color: #142D4E;
+}
